@@ -1,10 +1,11 @@
-import os
+mport os
 import logging
+import requests
+import json
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
-from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,7 +13,10 @@ logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher(bot, storage=MemoryStorage())
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+# OpenRouter API
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 class UserState(StatesGroup):
     birth_data = State()
@@ -71,26 +75,38 @@ async def handle_question(message: types.Message, state: FSMContext):
 Ответ: 250-400 слов.
 """
 
-    try:
-        chat_completion = groq_client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Ты — астролог-практик, ведущий личные консультации. Ты чувствуешь энергии и говоришь от сердца."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            model="llama3-70b-8192",
-            temperature=0.75,
-            max_tokens=1024,
-            top_p=1
-        )
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://your-telegram-bot-site.com",  # можно указать любую ссылку или оставить пустой
+        "X-Title": "AstroBot"
+    }
 
-        answer = chat_completion.choices[0].message.content.strip()
-        answer += "\n\n🌿 С любовью, Астера"
+    data = {
+        "model": "deepseek/deepseek-chat",
+        "messages": [
+            {
+                "role": "system",
+                "content": "Ты — астролог-практик, ведущий личные консультации. Ты чувствуешь энергии и говоришь от сердца."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": 0.75,
+        "max_tokens": 1024
+    }
+
+    try:
+        response = requests.post(OPENROUTER_URL, headers=headers, data=json.dumps(data))
+        result = response.json()
+
+        if "choices" in result and len(result["choices"]) > 0:
+            answer = result["choices"][0]["message"]["content"].strip()
+            answer += "\n\n🌿 С любовью, Астера"
+        else:
+            answer = "🌙 К сожалению, звёзды пока молчат... Попробуй задать вопрос чуть позже."
 
         if len(answer) > 4000:
             for i in range(0, len(answer), 4000):
@@ -99,7 +115,7 @@ async def handle_question(message: types.Message, state: FSMContext):
             await message.answer(answer, parse_mode="Markdown")
 
     except Exception as e:
-        await message.answer("🌙 Произошла звёздная помеха... Попробуй задать вопрос ещё раз.")
+        await message.answer(f"🌙 Произошла звёздная помеха: {str(e)}")
 
     await state.finish()
 
