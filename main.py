@@ -1,4 +1,4 @@
-mport os
+import os
 import logging
 import requests
 import json
@@ -78,7 +78,7 @@ async def handle_question(message: types.Message, state: FSMContext):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://your-telegram-bot-site.com",  # можно указать любую ссылку или оставить пустой
+        "HTTP-Referer": "https://your-telegram-bot-site.com",
         "X-Title": "AstroBot"
     }
 
